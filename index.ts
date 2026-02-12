@@ -219,6 +219,11 @@ function buildSlackPayload(event: FizzyEvent) {
 
 export default {
 	async fetch(request: Request, env: Env): Promise<Response> {
+		const url = new URL(request.url);
+		if (request.method === "GET" && url.pathname === "/") {
+			return new Response("ok");
+		}
+
 		if (request.method !== "POST") {
 			return new Response("Method not allowed", { status: 405 });
 		}
