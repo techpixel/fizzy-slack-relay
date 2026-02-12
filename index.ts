@@ -132,6 +132,31 @@ async function verifySignature(
 	return expected === signature;
 }
 
+function rewriteUrl(url: string): string {
+	return url.replace(/https?:\/\/[^/]+/, "https://fizzy.hackclub.com");
+}
+
+function fixUrls(event: FizzyEvent) {
+	if (event.eventable.url) {
+		event.eventable.url = rewriteUrl(event.eventable.url);
+	}
+	if ("board" in event.eventable && event.eventable.board?.creator?.url) {
+		event.eventable.board.creator.url = rewriteUrl(event.eventable.board.creator.url);
+	}
+	if (event.eventable.creator?.url) {
+		event.eventable.creator.url = rewriteUrl(event.eventable.creator.url);
+	}
+	if (event.board?.creator?.url) {
+		event.board.creator.url = rewriteUrl(event.board.creator.url);
+	}
+	if (event.creator?.url) {
+		event.creator.url = rewriteUrl(event.creator.url);
+	}
+	if (isCommentEvent(event) && event.eventable.reactions_url) {
+		event.eventable.reactions_url = rewriteUrl(event.eventable.reactions_url);
+	}
+}
+
 function buildSlackPayload(event: FizzyEvent) {
 	const action = event.action as FizzyAction;
 	const emoji = getActionEmoji(action);
@@ -249,6 +274,7 @@ export default {
 			return new Response("Invalid JSON", { status: 400 });
 		}
 
+		fixUrls(event);
 		const slackPayload = buildSlackPayload(event);
 
 		const slackResponse = await fetch(env.SLACK_WEBHOOK_URL, {
