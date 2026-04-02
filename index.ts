@@ -246,7 +246,7 @@ function buildSlackPayload(event: FizzyEvent) {
 						type: "section",
 						text: {
 							type: "mrkdwn",
-							text: `*<${cardUrl}|#${card.id} ${title}>*`,
+							text: `*<${cardUrl}|#${cardUrl.match(/(\d+)\/?$/)?.[1] ?? card.id} ${title}>*`,
 						},
 					},
 					{
