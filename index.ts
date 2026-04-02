@@ -252,15 +252,16 @@ function buildSlackPayload(event: FizzyEvent, cardDescription?: string | null) {
 	if (card.column) {
 		detailParts.push(`*Column*\n${card.column.name}`);
 	}
+	const contextParts = [timestamp];
 	if (card.golden) {
-		detailParts.push(`⭐ Golden`);
+		contextParts.push("⭐ Golden");
 	}
 
 	return {
 		text: `${slackEmoji} ${actor} ${label} card`,
 		attachments: [
 			{
-				color: "#5c20b1",
+				color: card.golden ? "#FFD700" : "#5c20b1",
 				blocks: [
 					{
 						type: "section",
@@ -281,7 +282,7 @@ function buildSlackPayload(event: FizzyEvent, cardDescription?: string | null) {
 						elements: [
 							{
 								type: "mrkdwn",
-								text: `${timestamp}`,
+								text: contextParts.join(" • "),
 							},
 						],
 					},
