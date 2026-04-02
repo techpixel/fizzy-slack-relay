@@ -227,10 +227,12 @@ function buildSlackPayload(event: FizzyEvent) {
 	const cardUrl = card.url;
 
 	const detailParts: string[] = [];
-	detailParts.push(`${emoji} *${actor}* ${label}`);
-	if (card.column) {
-		detailParts.push(`*Column:* ${card.column.name}`);
+	if (card.board) {
+		detailParts.push(`*Board*\n${card.board.name}`);
 	}
+	if (card.column) {
+		detailParts.push(`*Column*\n${card.column.name}`);
+	}	
 	if (card.golden) {
 		detailParts.push(`⭐ Golden`);
 	}
@@ -244,14 +246,14 @@ function buildSlackPayload(event: FizzyEvent) {
 						type: "section",
 						text: {
 							type: "mrkdwn",
-							text: `*<${cardUrl}|${emoji} ${title}>*`,
+							text: `*<${cardUrl}|#${card.id} ${title}>*`,
 						},
 					},
 					{
 						type: "section",
 						text: {
 							type: "mrkdwn",
-							text: detailParts.join(" • "),
+							text: detailParts.join("\n"),
 						},
 					},
 					{
@@ -259,7 +261,7 @@ function buildSlackPayload(event: FizzyEvent) {
 						elements: [
 							{
 								type: "mrkdwn",
-								text: `${event.board.name} • ${timestamp}`,
+								text: `${timestamp}`,
 							},
 						],
 					},
