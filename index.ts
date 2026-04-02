@@ -105,6 +105,23 @@ function getActionEmoji(action: string): string {
 	return emojis[action] ?? "📌";
 }
 
+function getActionSlackEmoji(action: string): string {
+	const emojis: Record<string, string> = {
+		card_published: ":memo:",
+		card_assigned: ":bust_in_silhouette:",
+		card_unassigned: ":bust_in_silhouette:",
+		card_closed: ":white_check_mark:",
+		card_reopened: ":arrows_counterclockwise:",
+		card_postponed: ":double_vertical_bar:",
+		card_auto_postponed: ":double_vertical_bar:",
+		card_triaged: ":clipboard:",
+		card_sent_back_to_triage: ":leftwards_arrow_with_hook:",
+		card_board_changed: ":arrow_right:",
+		comment_created: ":speech_balloon:",
+	};
+	return emojis[action] ?? ":pushpin:";
+}
+
 function isCommentEvent(
 	event: FizzyEvent
 ): event is FizzyEvent & { eventable: FizzyCommentEventable } {
@@ -162,6 +179,8 @@ function buildSlackPayload(event: FizzyEvent) {
 	const emoji = getActionEmoji(action);
 	const label = ACTION_LABELS[action] ?? action;
 	const actor = event.creator?.name ?? "Someone";
+	const slackEmoji = getActionSlackEmoji(action);
+	const timestamp = new Date(event.created_at).toLocaleString("en-US", { timeZone: "UTC" });
 
 	if (isCommentEvent(event)) {
 		const comment = event.eventable;
@@ -170,27 +189,32 @@ function buildSlackPayload(event: FizzyEvent) {
 			plainText.length > 300 ? plainText.slice(0, 300) + "…" : plainText;
 
 		return {
-			blocks: [
+			text: `${slackEmoji} ${actor} commented on a card`,
+			attachments: [
 				{
-					type: "section",
-					text: {
-						type: "mrkdwn",
-						text: `${emoji} *${actor}* commented on a card in *${event.board.name}*`,
-					},
-				},
-				{
-					type: "section",
-					text: {
-						type: "mrkdwn",
-						text: `> ${truncated}`,
-					},
-				},
-				{
-					type: "context",
-					elements: [
+					blocks: [
 						{
-							type: "mrkdwn",
-							text: `<${comment.url}|View comment>`,
+							type: "section",
+							text: {
+								type: "mrkdwn",
+								text: `*<${comment.url}|${emoji} ${actor} commented>*`,
+							},
+						},
+						{
+							type: "section",
+							text: {
+								type: "mrkdwn",
+								text: truncated,
+							},
+						},
+						{
+							type: "context",
+							elements: [
+								{
+									type: "mrkdwn",
+									text: `${event.board.name} • ${timestamp}`,
+								},
+							],
 						},
 					],
 				},
@@ -202,44 +226,47 @@ function buildSlackPayload(event: FizzyEvent) {
 	const title = card.title;
 	const cardUrl = card.url;
 
-	const fields: { type: string; text: string }[] = [];
-
+	const detailParts: string[] = [];
+	detailParts.push(`${emoji} *${actor}* ${label}`);
 	if (card.column) {
-		fields.push({ type: "mrkdwn", text: `*Column:* ${card.column.name}` });
+		detailParts.push(`*Column:* ${card.column.name}`);
 	}
-	fields.push({ type: "mrkdwn", text: `*Board:* ${event.board.name}` });
 	if (card.golden) {
-		fields.push({ type: "mrkdwn", text: `*Golden:* ⭐ Yes` });
+		detailParts.push(`⭐ Golden`);
 	}
 
-	const blocks: Record<string, unknown>[] = [
-		{
-			type: "section",
-			text: {
-				type: "mrkdwn",
-				text: `${emoji} *${actor}* ${label} *<${cardUrl}|${title}>*`,
-			},
-		},
-	];
-
-	if (fields.length > 0) {
-		blocks.push({
-			type: "section",
-			fields,
-		});
-	}
-
-	blocks.push({
-		type: "context",
-		elements: [
+	return {
+		text: `${slackEmoji} ${actor} ${label} card`,
+		attachments: [
 			{
-				type: "mrkdwn",
-				text: `${event.board.name} • ${new Date(event.created_at).toLocaleString("en-US", { timeZone: "UTC" })}`,
+				blocks: [
+					{
+						type: "section",
+						text: {
+							type: "mrkdwn",
+							text: `*<${cardUrl}|${emoji} ${title}>*`,
+						},
+					},
+					{
+						type: "section",
+						text: {
+							type: "mrkdwn",
+							text: detailParts.join(" • "),
+						},
+					},
+					{
+						type: "context",
+						elements: [
+							{
+								type: "mrkdwn",
+								text: `${event.board.name} • ${timestamp}`,
+							},
+						],
+					},
+				],
 			},
 		],
-	});
-
-	return { blocks };
+	};
 }
 
 export default {
