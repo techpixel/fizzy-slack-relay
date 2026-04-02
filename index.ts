@@ -176,14 +176,24 @@ function fixUrls(event: FizzyEvent) {
 }
 
 async function fetchCardDescription(cardUrl: string, apiToken: string): Promise<string | null> {
+	console.log(`[fetchCardDescription] Fetching description from: ${cardUrl}`);
 	try {
 		const res = await fetch(cardUrl, {
 			headers: { Authorization: `Bearer ${apiToken}` },
 		});
-		if (!res.ok) return null;
-		const card = (await res.json()) as { description?: string };
+		console.log(`[fetchCardDescription] Response status: ${res.status}`);
+		if (!res.ok) {
+			const errorText = await res.text();
+			console.error(`[fetchCardDescription] Non-OK response: ${res.status} ${errorText}`);
+			return null;
+		}
+		const body = await res.text();
+		console.log(`[fetchCardDescription] Response body: ${body.slice(0, 500)}`);
+		const card = JSON.parse(body) as { description?: string };
+		console.log(`[fetchCardDescription] Parsed description: ${card.description ?? "(undefined)"}`);
 		return card.description || null;
-	} catch {
+	} catch (err) {
+		console.error(`[fetchCardDescription] Error:`, err);
 		return null;
 	}
 }
@@ -314,6 +324,7 @@ export default {
 		const body = await request.text();
 
 		const signature = request.headers.get("X-Webhook-Signature");
+		console.log(`[webhook] Signature present: ${!!signature}`);
 		if (signature && env.FIZZY_SIGNING_SECRET) {
 			const valid = await verifySignature(
 				body,
@@ -321,28 +332,41 @@ export default {
 				env.FIZZY_SIGNING_SECRET
 			);
 			if (!valid) {
+				console.error("[webhook] Invalid signature, rejecting request");
 				return new Response("Invalid signature", { status: 401 });
 			}
+			console.log("[webhook] Signature verified successfully");
 		}
 
 		let event: FizzyEvent;
 		try {
 			event = JSON.parse(body) as FizzyEvent;
 		} catch {
+			console.error("[webhook] Failed to parse JSON body");
 			return new Response("Invalid JSON", { status: 400 });
 		}
 
+		console.log(`[webhook] Received event: action=${event.action} id=${event.id}`);
+		console.log(`[webhook] Event creator: ${event.creator?.name ?? "unknown"}`);
+		console.log(`[webhook] Eventable URL (before fixUrls): ${event.eventable.url}`);
+
 		fixUrls(event);
+		console.log(`[webhook] Eventable URL (after fixUrls): ${event.eventable.url}`);
 
 		let cardDescription: string | null = null;
 		if (!isCommentEvent(event) && env.FIZZY_API_TOKEN) {
+			console.log(`[webhook] Fetching card description for non-comment event`);
 			cardDescription = await fetchCardDescription(
 				(event.eventable as FizzyCardEventable).url,
 				env.FIZZY_API_TOKEN
 			);
+			console.log(`[webhook] Card description result: ${cardDescription ? cardDescription.slice(0, 100) : "(null)"}`);
+		} else {
+			console.log(`[webhook] Skipping description fetch: isComment=${isCommentEvent(event)} hasToken=${!!env.FIZZY_API_TOKEN}`);
 		}
 
 		const slackPayload = buildSlackPayload(event, cardDescription);
+		console.log(`[webhook] Slack payload: ${JSON.stringify(slackPayload).slice(0, 500)}`);
 
 		const slackResponse = await fetch(env.SLACK_WEBHOOK_URL, {
 			method: "POST",
@@ -350,12 +374,14 @@ export default {
 			body: JSON.stringify(slackPayload),
 		});
 
+		console.log(`[webhook] Slack response status: ${slackResponse.status}`);
 		if (!slackResponse.ok) {
 			const errorText = await slackResponse.text();
-			console.error(`Slack error: ${slackResponse.status} ${errorText}`);
+			console.error(`[webhook] Slack error: ${slackResponse.status} ${errorText}`);
 			return new Response("Failed to forward to Slack", { status: 502 });
 		}
 
+		console.log("[webhook] Successfully forwarded to Slack");
 		return new Response("OK", { status: 200 });
 	},
 };
