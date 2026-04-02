@@ -242,9 +242,16 @@ function buildSlackPayload(event: FizzyEvent, cardDescription?: string | null) {
 	const cardUrl = card.url;
 
 	const detailParts: string[] = [];
+	let descriptionBlock: object | null = null;
 	if (cardDescription) {
 		const truncated = cardDescription.length > 300 ? cardDescription.slice(0, 300) + "…" : cardDescription;
-		detailParts.push(truncated);
+		descriptionBlock = {
+			type: "section",
+			text: {
+				type: "mrkdwn",
+				text: truncated,
+			},
+		};
 	}
 	if (card.board) {
 		detailParts.push(`*Board*\n${card.board.name}`);
@@ -270,13 +277,14 @@ function buildSlackPayload(event: FizzyEvent, cardDescription?: string | null) {
 							text: `*<${cardUrl}|#${cardUrl.match(/(\d+)\/?$/)?.[1] ?? card.id} ${title}>*`,
 						},
 					},
-					{
+					...(descriptionBlock ? [descriptionBlock] : []),
+					...(detailParts.length > 0 ? [{
 						type: "section",
 						fields: detailParts.map((part) => ({
 							type: "mrkdwn",
 							text: part,
 						})),
-					},
+					}] : []),
 					{
 						type: "context",
 						elements: [
