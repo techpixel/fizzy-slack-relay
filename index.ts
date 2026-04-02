@@ -272,10 +272,10 @@ function buildSlackPayload(event: FizzyEvent, cardDescription?: string | null) {
 					},
 					{
 						type: "section",
-						text: {
+						fields: detailParts.map((part) => ({
 							type: "mrkdwn",
-							text: detailParts.join("\n"),
-						},
+							text: part,
+						})),
 					},
 					{
 						type: "context",
