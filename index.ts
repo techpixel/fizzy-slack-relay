@@ -1,6 +1,7 @@
 export interface Env {
 	SLACK_WEBHOOK_URL: string;
 	FIZZY_SIGNING_SECRET: string;
+	FIZZY_API_TOKEN: string;
 }
 
 interface FizzyUser {
@@ -174,7 +175,20 @@ function fixUrls(event: FizzyEvent) {
 	}
 }
 
-function buildSlackPayload(event: FizzyEvent) {
+async function fetchCardDescription(cardUrl: string, apiToken: string): Promise<string | null> {
+	try {
+		const res = await fetch(cardUrl, {
+			headers: { Authorization: `Bearer ${apiToken}` },
+		});
+		if (!res.ok) return null;
+		const card = (await res.json()) as { description?: string };
+		return card.description || null;
+	} catch {
+		return null;
+	}
+}
+
+function buildSlackPayload(event: FizzyEvent, cardDescription?: string | null) {
 	const action = event.action as FizzyAction;
 	const emoji = getActionEmoji(action);
 	const label = ACTION_LABELS[action] ?? action;
@@ -228,12 +242,16 @@ function buildSlackPayload(event: FizzyEvent) {
 	const cardUrl = card.url;
 
 	const detailParts: string[] = [];
+	if (cardDescription) {
+		const truncated = cardDescription.length > 300 ? cardDescription.slice(0, 300) + "…" : cardDescription;
+		detailParts.push(truncated);
+	}
 	if (card.board) {
 		detailParts.push(`*Board*\n${card.board.name}`);
 	}
 	if (card.column) {
 		detailParts.push(`*Column*\n${card.column.name}`);
-	}	
+	}
 	if (card.golden) {
 		detailParts.push(`⭐ Golden`);
 	}
@@ -306,7 +324,16 @@ export default {
 		}
 
 		fixUrls(event);
-		const slackPayload = buildSlackPayload(event);
+
+		let cardDescription: string | null = null;
+		if (!isCommentEvent(event) && env.FIZZY_API_TOKEN) {
+			cardDescription = await fetchCardDescription(
+				(event.eventable as FizzyCardEventable).url,
+				env.FIZZY_API_TOKEN
+			);
+		}
+
+		const slackPayload = buildSlackPayload(event, cardDescription);
 
 		const slackResponse = await fetch(env.SLACK_WEBHOOK_URL, {
 			method: "POST",
