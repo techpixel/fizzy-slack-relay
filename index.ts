@@ -192,6 +192,7 @@ function buildSlackPayload(event: FizzyEvent) {
 			text: `${slackEmoji} ${actor} commented on a card`,
 			attachments: [
 				{
+					color: "#5c20b1",
 					blocks: [
 						{
 							type: "section",
@@ -241,6 +242,7 @@ function buildSlackPayload(event: FizzyEvent) {
 		text: `${slackEmoji} ${actor} ${label} card`,
 		attachments: [
 			{
+				color: "#5c20b1",
 				blocks: [
 					{
 						type: "section",
